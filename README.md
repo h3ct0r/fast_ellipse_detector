@@ -6,8 +6,12 @@ Original author: mikispace (https://sourceforge.net/projects/yaed/)
 
 ### How to compile:
 
-g++ Main.cpp EllipseDetectorYaed.cpp common.cpp -o ellipse_det -std=c++11 `pkg-config --cflags --libs opencv
+```sh
+g++ Main.cpp EllipseDetectorYaed.cpp common.cpp -o ellipse_det -std=c++11 `pkg-config --cflags --libs opencv`
+```
 
 ### How to run:
 
+```sh
 ./ellipse_det
+```
