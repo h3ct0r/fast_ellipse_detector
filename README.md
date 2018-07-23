@@ -4,6 +4,11 @@ It runs on Ubuntu 16.04.
 
 Original author: mikispace (https://sourceforge.net/projects/yaed/)
 
+Michele Fornaciari, Andrea Prati, Rita Cucchiara, 
+"A fast and effective ellipse detector for embedded vision applications", Pattern Recognition, 2014
+
+(http://www.sciencedirect.com/science/article/pii/S0031320314001976)
+
 ### How to compile:
 
 ```sh
