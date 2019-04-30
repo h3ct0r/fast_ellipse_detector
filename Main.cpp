@@ -20,6 +20,9 @@ last update: 23/12/2014
 */
 
 //#include <cv.hpp>
+#include <limits.h> /* PATH_MAX */
+#include <stdlib.h>
+#include <stdio.h>
 #include <cv.h>
 #include <highgui.h>
 
@@ -264,13 +267,20 @@ std::tuple<float, float, float> Evaluate(const vector<Ellipse>& ellGT, const vec
 	return make_tuple(pr, re, fmeasure);
 }
 
-void OnImage()
+void OnImage(char *image_path)
 {
-	string sWorkingDir = "/home/itv/Desktop/ellipse_detect";
-	string imagename = "1.jpg";
+	// Check if the file provided is a valid image
+	string filename(image_path);
+	string file_basename = basename(image_path);
+	string ext = file_basename.substr(file_basename.find_last_of(".") + 1);
+	if (!((ext == "jpeg") || (ext == "jpg"))) {
+		cout << "image must be .jpeg or .jpg" << endl;
+		return;
+	}
 
-	string filename = sWorkingDir + "/images/" + imagename;
-
+	string filename_minus_ext = filename.substr(0, filename.find_last_of("."));
+	cout << "Annotating image \"" << image_path << "\"" << endl;
+	
 	// Read image
 	Mat3b image = imread(filename);
 	Size sz = image.size();
@@ -335,7 +345,7 @@ void OnImage()
 
 
 	vector<Ellipse> gt;
-	LoadGT(gt, sWorkingDir + "/gt/" + "gt_" + imagename + ".txt", true); // Prasad is in radians
+	LoadGT(gt, filename_minus_ext + ".txt", true); // Prasad is in radians
 
 	Mat3b resultImage = image.clone();
 
@@ -354,8 +364,9 @@ void OnImage()
 
 	Evaluate(gt, ellsYaed, fThScoreScore, res);
 
-
-	imshow("Yaed", resultImage);
+	// Show the image in a scalable window.
+	namedWindow("Annotated Image", WINDOW_NORMAL);
+	imshow("Annotated Image", resultImage);
 	waitKey();
 }
 
@@ -599,10 +610,21 @@ void OnDataset()
 
 int main(int argc, char** argv)
 {
-	OnVideo();
-	//OnImage();
+	if (argc != 2) {
+		cout << "Expected one argument" << endl;
+		return 1;
+	}
+	char *unresolved_path = argv[1];
+	char *resolved_path = (char *)malloc(PATH_MAX);
+	realpath(unresolved_path, resolved_path);
+	// char *extension = (char *)malloc(20);
+	// _splitpath_s(resolved_path, NULL, 0, NULL, 0, NULL, 0, extension, 20);
+	// cout << "file extension: " << extension << endl;
+	// OnVideo();
+	OnImage(resolved_path);
 	//OnDataset();
-
+	free(resolved_path);
+	// free(extension);
 	return 0;
 }
 
