@@ -1,4 +1,4 @@
-# fast_ellipse_detector
+# Fast Ellipse Detector
 This is the implementation in C++ of the paper: 'A fast and effective ellipse detector for embedded vision applications'.
 It runs on Ubuntu 16.04 with OpenCV 2.4.13.  
 
