@@ -23,8 +23,12 @@ last update: 23/12/2014
 #include <limits.h> /* PATH_MAX */
 #include <stdlib.h>
 #include <stdio.h>
-#include <cv.h>
-#include <highgui.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <opencv2/opencv.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include "EllipseDetectorYaed.h"
 #include <fstream>
@@ -271,7 +275,7 @@ void OnImage(char *image_path)
 {
 	// Check if the file provided is a valid image
 	string filename(image_path);
-	string file_basename = basename(image_path);
+	string file_basename = filename.substr(filename.find_last_of("/") + 1);
 	string ext = file_basename.substr(file_basename.find_last_of(".") + 1);
 	if (!((ext == "jpeg") || (ext == "jpg"))) {
 		cout << "image must be .jpeg or .jpg" << endl;
@@ -287,7 +291,7 @@ void OnImage(char *image_path)
 
 	// Convert to grayscale
 	Mat1b gray;
-	cvtColor(image, gray, CV_BGR2GRAY);
+	cvtColor(image, gray, cv::COLOR_BGR2GRAY);
 
 
 	// Parameters Settings (Sect. 4.2)
@@ -365,7 +369,7 @@ void OnImage(char *image_path)
 	Evaluate(gt, ellsYaed, fThScoreScore, res);
 
 	// Show the image in a scalable window.
-	namedWindow("Annotated Image", WINDOW_NORMAL);
+	namedWindow("Annotated Image", cv::WINDOW_NORMAL);
 	imshow("Annotated Image", resultImage);
 	waitKey();
 }
@@ -423,7 +427,7 @@ void OnVideo()
 	{	
 		Mat3b image;
 		cap >> image;
-		cvtColor(image, gray, CV_BGR2GRAY);	
+		cvtColor(image, gray, cv::COLOR_BGR2GRAY);	
 
 			vector<Ellipse> ellsYaed;
 		Mat1b gray2 = gray.clone();
@@ -473,9 +477,15 @@ void OnVideo()
 
 void OnDataset()
 {
-	string sWorkingDir = "D:\\data\\ellipse_dataset\\Random Images - Dataset #1\\";
-	//string sWorkingDir = "D:\\data\\ellipse_dataset\\Prasad Images - Dataset Prasad\\";
-	string out_folder = "D:\\data\\ellipse_dataset\\";
+	string sWorkingDir = "./GED_TEST/";
+	string out_folder = "./GED_TEST_RESULTS/";
+	string params_folder = out_folder + "params/";
+	string images_folder = out_folder + "images/";
+	
+	// Create output directories if they don't exist
+	mkdir(out_folder.c_str(), 0755);
+	mkdir(params_folder.c_str(), 0755);
+	mkdir(images_folder.c_str(), 0755);
 
 	vector<string> names;
 
@@ -484,14 +494,14 @@ void OnDataset()
 	vector<float> fms;
 	vector<double> tms;
 
-	glob(sWorkingDir + "images\\" + "*.*", names);
+	glob(sWorkingDir + "*.*", names);
 
 	int counter = 0;
 	for (const auto& image_name : names)
 	{
 		cout << double(counter++) / names.size() << "\n";
 
-		string name_ext = image_name.substr(image_name.find_last_of("\\") + 1);
+		string name_ext = image_name.substr(image_name.find_last_of("/") + 1);
 		string name = name_ext.substr(0, name_ext.find_last_of("."));
 
 		Mat3b image = imread(image_name);
@@ -499,7 +509,7 @@ void OnDataset()
 
 		// Convert to grayscale
 		Mat1b gray;
-		cvtColor(image, gray, CV_BGR2GRAY);
+		cvtColor(image, gray, cv::COLOR_BGR2GRAY);
 
 		// Parameters Settings (Sect. 4.2)
 		int		iThLength = 16;
@@ -541,7 +551,7 @@ void OnDataset()
 		Mat1b gray2 = gray.clone();
 		yaed->Detect(gray2, ellsYaed);
 
-		/*vector<double> times = yaed.GetTimes();
+		vector<double> times = yaed->GetTimes();
 		cout << "--------------------------------" << endl;
 		cout << "Execution Time: " << endl;
 		cout << "Edge Detection: \t" << times[0] << endl;
@@ -551,22 +561,24 @@ void OnDataset()
 		cout << "Validation:     \t" << times[4] << endl;
 		cout << "Clustering:     \t" << times[5] << endl;
 		cout << "--------------------------------" << endl;
-		cout << "Total:	         \t" << yaed.GetExecTime() << endl;
-		cout << "--------------------------------" << endl;*/
+		cout << "Total:	         \t" << yaed->GetExecTime() << endl;
+		cout << "--------------------------------" << endl;
 
 		tms.push_back(yaed->GetExecTime());
 
 
 		vector<Ellipse> gt;
-		LoadGT(gt, sWorkingDir + "gt\\" + "gt_" + name_ext + ".txt", false); // Prasad is in radians,set to true
+		// Skip loading ground truth since we don't have it for GED_TEST
+		// LoadGT(gt, sWorkingDir + "gt/" + "gt_" + name_ext + ".txt", false); 
 
+		// Skip evaluation since we don't have ground truth
+		// float pr, re, fm;
+		// std::tie(pr, re, fm) = Evaluate(gt, ellsYaed, fThScoreScore, image);
 
-		float pr, re, fm;
-		std::tie(pr, re, fm) = Evaluate(gt, ellsYaed, fThScoreScore, image);
-
-		prs.push_back(pr);
-		res.push_back(re);
-		fms.push_back(fm);
+		// Skip adding to evaluation vectors since we don't have evaluation results
+		// prs.push_back(pr);
+		// res.push_back(re);
+		// fms.push_back(fm);
 
 		Mat3b resultImage = image.clone();
 
@@ -580,51 +592,84 @@ void OnDataset()
 
 		yaed->DrawDetectedEllipses(resultImage, ellsYaed);
 
-		//imwrite(out_folder + name + ".png", resultImage);
+		// Save ellipse parameters to text file
+		string params_file = params_folder + name + "_params.txt";
+		ofstream params_out(params_file);
+		if (params_out.is_open()) {
+			// Write the number of detected ellipses
+			params_out << ellsYaed.size() << endl;
+			
+			// Write each ellipse's parameters
+			for (const auto& ellipse : ellsYaed) {
+				// Format: xc yc a b rad score
+				params_out << ellipse._xc << " " << ellipse._yc << " " 
+				          << ellipse._a << " " << ellipse._b << " " 
+				          << ellipse._rad << " " << ellipse._score << endl;
+			}
+			params_out.close();
+		}
+
+		// Save detected ellipse image
+		string img_file = images_folder + name + "_detected.png";
+		imwrite(img_file, resultImage);
 		//imshow("Yaed", resultImage);
 		//waitKey();
-
 
 		int dbg = 0;
 	}
 
-	float N = float(prs.size());
-	float sumPR = accumulate(prs.begin(), prs.end(), 0.f);
-	float sumRE = accumulate(res.begin(), res.end(), 0.f);
-	float sumFM = accumulate(fms.begin(), fms.end(), 0.f);
+	// Calculate and output evaluation metrics
 	double sumTM = accumulate(tms.begin(), tms.end(), 0.0);
+	double meanTM = sumTM / tms.size();
 
-	float meanPR = sumPR / N;
-	float meanRE = sumRE / N;
-	float meanFM = sumFM / N;
-	double meanTM = sumTM / N;
+	cout << "\n=== Evaluation Metrics ===" << endl;
+	cout << "Average execution time per image: " << meanTM << " ms" << endl;
+	cout << "Total images processed: " << tms.size() << endl;
 
-	float finalFM = (2.f * meanPR * meanRE) / (meanPR + meanRE);
+	// Save metrics to a text file
+	string metrics_file = out_folder + "evaluation_metrics.txt";
+	ofstream metrics_out(metrics_file);
+	if (metrics_out.is_open()) {
+		metrics_out << "=== Evaluation Metrics ===" << endl;
+		metrics_out << "Average execution time per image: " << meanTM << " ms" << endl;
+		metrics_out << "Total images processed: " << tms.size() << endl;
+		metrics_out.close();
+	}
 
-	cout << "F-measure : " << finalFM << endl;
-	cout << "Exec time : " << meanTM << endl;
+	cout << "\n=== Parameter Definitions ===" << endl;
+	cout << "Each ellipse's parameters are saved in the format: xc yc a b rad score" << endl;
+	cout << "  xc   : x-coordinate of the ellipse center" << endl;
+	cout << "  yc   : y-coordinate of the ellipse center" << endl;
+	cout << "  a    : semi-major axis length" << endl;
+	cout << "  b    : semi-minor axis length" << endl;
+	cout << "  rad  : rotation angle in radians (0 to PI)" << endl;
+	cout << "  score: detection score (higher is better)" << endl;
 
-	getchar();
+	cout << "\nDetection results saved to: " << out_folder << endl;
 }
 
 
 int main(int argc, char** argv)
 {
 	if (argc != 2) {
-		cout << "Expected one argument" << endl;
+		cout << "Usage: " << argv[0] << " <image_path | --dataset>" << endl;
+		cout << "  image_path: Path to a single image to process" << endl;
+		cout << "  --dataset: Process all images in GED_TEST directory" << endl;
 		return 1;
 	}
-	char *unresolved_path = argv[1];
-	char *resolved_path = (char *)malloc(PATH_MAX);
-	realpath(unresolved_path, resolved_path);
-	// char *extension = (char *)malloc(20);
-	// _splitpath_s(resolved_path, NULL, 0, NULL, 0, NULL, 0, extension, 20);
-	// cout << "file extension: " << extension << endl;
-	// OnVideo();
-	OnImage(resolved_path);
-	//OnDataset();
-	free(resolved_path);
-	// free(extension);
+	
+	if (strcmp(argv[1], "--dataset") == 0) {
+		// Run dataset mode
+		OnDataset();
+	} else {
+		// Run single image mode
+		char *unresolved_path = argv[1];
+		char *resolved_path = (char *)malloc(PATH_MAX);
+		realpath(unresolved_path, resolved_path);
+		OnImage(resolved_path);
+		free(resolved_path);
+	}
+	
 	return 0;
 }
 
@@ -647,7 +692,7 @@ int main2()
 		
 		// Convert to grayscale
 		Mat1b gray;
-		cvtColor(image, gray, CV_BGR2GRAY);
+		cvtColor(image, gray, cv::COLOR_BGR2GRAY);
 		
 		// Parameters Settings (Sect. 4.2)
 		int		iThLength = 16;
